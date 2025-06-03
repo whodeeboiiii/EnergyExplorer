@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Energy Data Explorer</title>
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app-container">
+    <!-- Left Half: Map and Controls -->
+    <div id="left-panel">
+      <header>
+        <h1>World Energy Data Explorer</h1>
+        <div id="controls">
+          <div id="year-control">
+            <label for="year-slider">Year: <span id="year-value">2018</span></label>
+            <input id="year-slider" type="range" min="1980" max="2021" value="2018" step="1">
+            <div class="slider-labels">
+              <span>1980</span>
+              <span>2021</span>
+            </div>
+          </div>
+        </div>
+      </header>
+      
+      <div id="map-section">
+        <svg id="map"></svg>
+      </div>
+    </div>
+    
+    <!-- Right Half: Horizontal Stacked Bar Chart -->
+    <div id="right-panel">
+      <div id="horizontal-chart-container">
+        <svg id="horizontal-chart"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- Detail Panel (Overlay) -->
+  <div id="detail-panel" class="hidden">
+    <button id="close-detail">×</button>
+    <h2 id="country-name"></h2>
+    <div class="chart-container">
+      <h3>Self-Sufficiency Trend</h3>
+      <div id="bar-chart"></div>
+    </div>
+    <div class="data-summary">
+      <h3>Key Statistics for <span id="year-value-detail">2018</span></h3>
+      <div id="stats-grid">
+        <div class="stat-item">
+          <span class="stat-label">Generation</span>
+          <span class="stat-value" id="stat-production">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Consumption</span>
+          <span class="stat-value" id="stat-consumption">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Imports</span>
+          <span class="stat-value" id="stat-trade">-</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">Self-Sufficiency</span>
+          <span class="stat-value" id="stat-sufficiency">-</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div id="map-tooltip" class="hidden">
+    <div id="tooltip-title"></div>
+    <div id="tooltip-value"></div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
