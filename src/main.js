@@ -14,6 +14,7 @@ const horizontalChartSvg = d3.select('#horizontal-chart');
 let currentYear = 2018;
 let currentMetric = 'self_sufficiency_rate';
 let currentScale = 'linear';
+let showAllCountries = false; // Track whether to show all countries or just top 30
 
 // Calculate global maximum self-sufficiency rate across all years
 let globalMaxSelfSufficiency = 0;
@@ -470,7 +471,7 @@ function highlightCountryBar(countryName) {
   }
   
   // Find the index of this country in the current chart data
-  const chartData = [];
+  const allChartData = [];
   Object.values(countriesData).forEach(country => {
     const gen = country.net_generation?.[currentYear];
     const cons = country.net_consumption?.[currentYear];
@@ -478,7 +479,7 @@ function highlightCountryBar(countryName) {
     
     if (gen != null && cons != null && imp != null &&
         !isNaN(gen) && !isNaN(cons) && !isNaN(imp)) {
-      chartData.push({
+      allChartData.push({
         country: country.name,
         generation: gen,
         consumption: cons,
@@ -488,10 +489,14 @@ function highlightCountryBar(countryName) {
     }
   });
   
-  chartData.sort((a, b) => a.country.localeCompare(b.country));
+  // Sort countries by net consumption (largest to smallest)
+  allChartData.sort((a, b) => b.consumption - a.consumption);
+  
+  // Use the same filtering logic as drawHorizontalChart
+  const chartData = showAllCountries ? allChartData : allChartData.slice(0, 30);
   const countryIndex = chartData.findIndex(d => d.country === countryName);
   
-  if (countryIndex === -1) return;
+  if (countryIndex === -1) return; // Country not in current view
   
   // Highlight the bars for this country
   horizontalChartSvg.selectAll('.consumption-bar')
@@ -510,7 +515,7 @@ function highlightCountryBar(countryName) {
   const container = d3.select('#horizontal-chart-container').node();
   const containerWidth = container.clientWidth - 16;
   const containerHeight = container.clientHeight - 16;
-  const margin = { top: 10, right: 120, bottom: 25, left: 120 };
+  const margin = { top: 10, right: 120, bottom: 50, left: 120 }; // Match drawHorizontalChart margin
   const chartWidth = containerWidth - margin.left - margin.right;
   const availableHeight = containerHeight - margin.top - margin.bottom;
   
@@ -529,36 +534,46 @@ function highlightCountryBar(countryName) {
   
   // Add labels for the highlighted country
   const yPos = yScale(countryIndex) + barHeight / 2;
+  const labelYPos = yPos + barHeight * 1.5; // Position labels below the bars
   
-  // Consumption label
+  // Consumption label (gray) - positioned to the right of the bar
   if (consumption > 0) {
     chartGroup.append('text')
       .attr('class', 'value-label')
-      .attr('x', xScale(consumption) + 5)
+      .attr('x', xScale(consumption) + 15)
       .attr('y', yPos)
       .attr('alignment-baseline', 'middle')
+      .style('fill', '#666')
+      .style('font-size', '10px')
+      .style('font-weight', '600')
       .text(`${consumption.toFixed(1)} TWh`);
   }
   
-  // Generation label
+  // Generation label (blue)
   if (generation > 0) {
     chartGroup.append('text')
       .attr('class', 'value-label')
       .attr('x', xScale(generation / 2))
-      .attr('y', yPos)
+      .attr('y', labelYPos)
       .attr('text-anchor', 'middle')
       .attr('alignment-baseline', 'middle')
+      .style('fill', '#2196F3')
+      .style('font-size', '10px')
+      .style('font-weight', '600')
       .text(`${generation.toFixed(1)}`);
   }
   
-  // Imports label
+  // Imports label (red)
   if (imports > 0) {
     chartGroup.append('text')
       .attr('class', 'value-label')
       .attr('x', xScale(generation) + xScale(imports / 2))
-      .attr('y', yPos)
+      .attr('y', labelYPos)
       .attr('text-anchor', 'middle')
       .attr('alignment-baseline', 'middle')
+      .style('fill', '#e53e3e')
+      .style('font-size', '10px')
+      .style('font-weight', '600')
       .text(`${imports.toFixed(1)}`);
   }
 }
@@ -576,6 +591,42 @@ function showTooltip(event, d) {
   const countryData = getCountryData(countryName);
 
   const tooltip = d3.select('#map-tooltip');
+  
+  // Check if country is in current chart view and make button glow if not
+  if (!showAllCountries && countryData) {
+    // Get the current top 30 countries
+    const allChartData = [];
+    Object.values(countriesData).forEach(country => {
+      const generation = country.net_generation?.[currentYear];
+      const consumption = country.net_consumption?.[currentYear];
+      const imports = country.imports?.[currentYear];
+      
+      if (generation != null && consumption != null && imports != null &&
+          !isNaN(generation) && !isNaN(consumption) && !isNaN(imports)) {
+        allChartData.push({
+          country: country.name,
+          consumption: consumption
+        });
+      }
+    });
+    
+    allChartData.sort((a, b) => b.consumption - a.consumption);
+    const top30Countries = allChartData.slice(0, 30);
+    const isInTop30 = top30Countries.some(c => c.country === countryName);
+    
+    // Make button glow if country is not in top 30
+    if (!isInTop30) {
+      d3.selectAll('.toggle-button')
+        .attr('fill', '#ffeb3b')
+        .attr('stroke', '#ffc107')
+        .attr('stroke-width', 2)
+        .style('filter', 'drop-shadow(0 0 8px #ffc107)');
+      
+      d3.selectAll('.toggle-button-text')
+        .style('fill', '#333')
+        .style('font-weight', 'bold');
+    }
+  }
   
   // Highlight the corresponding bar in the chart
   highlightCountryBar(countryName);
@@ -614,6 +665,17 @@ function hideTooltip() {
   d3.select('#map-tooltip').classed('hidden', true);
   // Remove bar highlighting when tooltip is hidden
   removeCountryBarHighlight();
+  
+  // Remove button glow effect
+  d3.selectAll('.toggle-button')
+    .attr('fill', '#f0f0f0')
+    .attr('stroke', '#ccc')
+    .attr('stroke-width', 1)
+    .style('filter', null);
+  
+  d3.selectAll('.toggle-button-text')
+    .style('fill', '#333')
+    .style('font-weight', '600');
 }
 
 function onCountryClick(event, d) {
@@ -767,7 +829,7 @@ function drawHorizontalChart() {
   horizontalChartSvg.selectAll('*').remove();
   
   // Prepare data for all countries
-  const chartData = [];
+  const allChartData = [];
   Object.values(countriesData).forEach(country => {
     const generation = country.net_generation?.[currentYear];
     const consumption = country.net_consumption?.[currentYear];
@@ -776,7 +838,7 @@ function drawHorizontalChart() {
     // Only include countries with valid data
     if (generation != null && consumption != null && imports != null &&
         !isNaN(generation) && !isNaN(consumption) && !isNaN(imports)) {
-      chartData.push({
+      allChartData.push({
         country: country.name,
         generation: generation,
         consumption: consumption,
@@ -786,8 +848,11 @@ function drawHorizontalChart() {
     }
   });
   
-  // Sort countries alphabetically
-  chartData.sort((a, b) => a.country.localeCompare(b.country));
+  // Sort countries by net consumption (largest to smallest)
+  allChartData.sort((a, b) => b.consumption - a.consumption);
+  
+  // Limit to top 30 countries if showAllCountries is false
+  const chartData = showAllCountries ? allChartData : allChartData.slice(0, 30);
   
   if (chartData.length === 0) {
     horizontalChartSvg.append('text')
@@ -806,7 +871,7 @@ function drawHorizontalChart() {
   const containerHeight = container.clientHeight - 16; // Account for padding
   
   // Chart dimensions and margins - fit to container
-  const margin = { top: 10, right: 120, bottom: 25, left: 120 };
+  const margin = { top: 10, right: 120, bottom: 50, left: 120 }; // Increased bottom margin for button
   const chartWidth = containerWidth - margin.left - margin.right;
   const chartHeight = containerHeight - margin.top - margin.bottom;
   
@@ -853,9 +918,9 @@ function drawHorizontalChart() {
     .append('rect')
     .attr('class', 'consumption-bar')
     .attr('x', 0)
-    .attr('y', (d, i) => yScale(i) - barHeight * 0.1)
+    .attr('y', (d, i) => yScale(i) - barHeight * 0.3)
     .attr('width', d => xScale(d.consumption))
-    .attr('height', barHeight * 1.2); // Slightly taller than other bars
+    .attr('height', barHeight * 1.6); // Made wider than before
   
   // Draw generation bars (blue)
   chartGroup.selectAll('.generation-bar')
@@ -934,6 +999,47 @@ function drawHorizontalChart() {
       .style('font-size', '9px')
       .style('fill', '#333')
       .text(item.label);
+  });
+  
+  // Add toggle button for showing all countries
+  const buttonGroup = horizontalChartSvg.append('g')
+    .attr('transform', `translate(${containerWidth - 160}, ${containerHeight - 35})`);
+  
+  // Button background
+  const buttonRect = buttonGroup.append('rect')
+    .attr('class', 'toggle-button')
+    .attr('width', 150)
+    .attr('height', 25)
+    .attr('rx', 3)
+    .attr('fill', '#f0f0f0')
+    .attr('stroke', '#ccc')
+    .attr('stroke-width', 1)
+    .style('cursor', 'pointer');
+  
+  // Button text
+  const buttonText = buttonGroup.append('text')
+    .attr('class', 'toggle-button-text')
+    .attr('x', 75)
+    .attr('y', 16)
+    .attr('text-anchor', 'middle')
+    .attr('alignment-baseline', 'middle')
+    .style('font-size', '11px')
+    .style('font-weight', '600')
+    .style('fill', '#333')
+    .style('cursor', 'pointer')
+    .text(showAllCountries ? 'Show Top 30' : 'Show All Countries');
+  
+  // Add click handler to button
+  buttonGroup.on('click', function() {
+    showAllCountries = !showAllCountries;
+    drawHorizontalChart(); // Redraw chart with new setting
+  });
+  
+  // Add hover effects
+  buttonGroup.on('mouseover', function() {
+    buttonRect.attr('fill', '#e0e0e0');
+  }).on('mouseout', function() {
+    buttonRect.attr('fill', '#f0f0f0');
   });
 }
 
